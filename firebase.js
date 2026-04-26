@@ -1,7 +1,3 @@
-/ ============================================================================
-// 🔥 FIREBASE CONFIGURATION
-// ============================================================================
-
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, get } from 'firebase/database';
 
