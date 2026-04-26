@@ -6,6 +6,14 @@ const TEACHER_PASSWORD = 'urbina2026';
 const CENTRAL_BANK_ID = 'CENTRAL_BANK';
 const CURRENCY_NAME = 'IGOs';
 
+// Default data structure - SIEMPRE tiene estos campos
+const DEFAULT_DATA = {
+  students: [],
+  transactions: [],
+  bonusRequests: [],
+  centralBank: { balance: 0, name: 'P4 Central Bank' }
+};
+
 // Themes for student interface
 const STUDENT_THEMES = {
   black_gold: { name: 'Black & Gold', primary: '#000000', secondary: '#d4af37', accent: '#f5e7b8', bgGradient: 'linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%)' },
@@ -13,7 +21,6 @@ const STUDENT_THEMES = {
 };
 
 // Use system fonts that are elegant and always available
-// These are pre-installed on Mac, Windows, iOS, and Android — no internet needed
 const FONT_DISPLAY = "'Didot', 'Bodoni 72', 'Bodoni MT', 'Playfair Display', Georgia, 'Times New Roman', serif";
 const FONT_BODY = "'Helvetica Neue', 'Helvetica', 'Arial', system-ui, sans-serif";
 const FONT_MONO = "'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace";
@@ -95,12 +102,6 @@ const copyToClipboard = async (text) => {
   }
 };
 
-const hasUnlocked = (student, design, transactions) => {
-  if (design.tier === 'basic') return true;
-  const totalEarned = transactions.filter(t => t.studentId === student.id && t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  return totalEarned >= (design.minBalance || 0);
-};
-
 // Compress image to reduce size aggressively (must fit in <500KB for storage)
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
@@ -147,9 +148,16 @@ const compressImage = (file) => {
   });
 };
 
+const hasUnlocked = (student, design, transactions) => {
+  if (design.tier === 'basic') return true;
+  const totalEarned = transactions.filter(t => t.studentId === student.id && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  return totalEarned >= (design.minBalance || 0);
+};
+
+// ===== MAIN APP COMPONENT =====
 export default function App() {
   const [view, setView] = useState('home');
-  const [data, setData] = useState({ students: [], transactions: [], bonusRequests: [], centralBank: { balance: 0, name: 'P4 Central Bank' } });
+  const [data, setData] = useState(DEFAULT_DATA);
   const [loading, setLoading] = useState(true);
   const [studentCode, setStudentCode] = useState('');
   const [studentPin, setStudentPin] = useState('');
@@ -160,16 +168,36 @@ export default function App() {
   const [teacherError, setTeacherError] = useState('');
 
   useEffect(() => {
-    // Subscribe to Firebase real-time updates
+    // Subscribe to Firebase real-time updates with safety checks
     const unsubscribe = subscribeToData((newData) => {
-      setData(newData);
+      // Ensure all required fields exist
+      const safeData = {
+        students: newData?.students || [],
+        transactions: newData?.transactions || [],
+        bonusRequests: newData?.bonusRequests || [],
+        centralBank: newData?.centralBank || { balance: 0, name: 'P4 Central Bank' }
+      };
+      setData(safeData);
       setLoading(false);
     });
-    return () => unsubscribe();
+    
+    // Set timeout to show app even if Firebase fails
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   useEffect(() => {
-    if (currentStudent) {
+    if (view === 'teacher' && !teacherAuth) setView('teacher-login');
+  }, [view, teacherAuth]);
+
+  useEffect(() => {
+    if (currentStudent && data.students && data.students.length > 0) {
       const u = data.students.find(s => s.id === currentStudent.id);
       if (u) setCurrentStudent(u);
     }
@@ -222,17 +250,12 @@ export default function App() {
     } else setTeacherError('Incorrect password.');
   };
 
-  // Auto-redirect to login if not authenticated when trying to access teacher view
-  useEffect(() => {
-    if (view === 'teacher' && !teacherAuth) setView('teacher-login');
-  }, [view, teacherAuth]);
-
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="text-amber-400 text-xl" style={{fontFamily: FONT_BODY}}>Loading...</div></div>;
 
   if (view === 'home') return <HomeView setView={setView} />;
   if (view === 'teacher-login') return <TeacherLoginView teacherPass={teacherPass} setTeacherPass={setTeacherPass} handleLogin={handleTeacherLogin} error={teacherError} setView={setView} />;
   if (view === 'teacher' && teacherAuth) return <TeacherView data={data} saveData={saveData} setView={setView} onLogout={() => { setTeacherAuth(false); setView('home'); }} />;
-  if (view === 'student-login') return <StudentLoginView studentCode={studentCode} setStudentCode={setStudentCode} studentPin={studentPin} setStudentPin={setStudentPin} handleLogin={handleStudentLogin} loginError={loginError} setView={setView} students={data.students} />;
+  if (view === 'student-login') return <StudentLoginView studentCode={studentCode} setStudentCode={setStudentCode} studentPin={studentPin} setStudentPin={setStudentPin} handleLogin={handleStudentLogin} loginError={loginError} setView={setView} students={data.students || []} />;
   if (view === 'student' && currentStudent) return <StudentView student={currentStudent} data={data} saveData={saveData} onLogout={() => { setCurrentStudent(null); setView('home'); }} />;
   
   return <HomeView setView={setView} />;
@@ -243,7 +266,7 @@ function HomeView({ setView }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{fontFamily: FONT_BODY, background: 'radial-gradient(ellipse at center, #1c1917 0%, #000000 100%)'}}>
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-0 w-96 h-96 rounded-full" style={{background: 'radial-gradient(circle, #fbbf24 0%, transparent 70%)'}}></div>
+        <div className="absolute top-0 left-0 w-96 h-96 rounded-full" style={{background: 'radial-gradient(circle, #d4af37 0%, transparent 70%)'}}></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full" style={{background: 'radial-gradient(circle, #7f1d1d 0%, transparent 70%)'}}></div>
       </div>
       <div className="max-w-2xl w-full relative z-10">
@@ -251,27 +274,27 @@ function HomeView({ setView }) {
           <Globe className="mx-auto text-amber-400 mb-4" size={48} />
           <div className="text-amber-500 text-xs tracking-[0.5em] mb-3">EST. 2022</div>
           <h1 className="text-5xl md:text-7xl font-bold mb-3" style={{fontFamily: FONT_DISPLAY, background: 'linear-gradient(135deg, #d4af37 0%, #f5e7b8 50%, #d4af37 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '0.02em'}}>P4 Central Bank</h1>
-          <div className="h-px w-32 mx-auto mb-4" style={{background: 'linear-gradient(90deg, transparent, #fbbf24, transparent)'}}></div>
+          <div className="h-px w-32 mx-auto mb-4" style={{background: 'linear-gradient(90deg, transparent, #d4af37, transparent)'}}></div>
           <p className="text-amber-200/80 italic text-sm tracking-widest">ISSUED BY PROFESSOR TOMÁS URBINA</p>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <button onClick={() => setView('teacher-login')} className="relative bg-gradient-to-br from-stone-900 to-black border-2 border-amber-600 p-8 transition-all hover:scale-105 hover:border-amber-400 group overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition" style={{background: 'radial-gradient(circle, #fbbf24, transparent)'}}></div>
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition" style={{background: 'radial-gradient(circle, #d4af37, transparent)'}}></div>
             <Building2 size={40} className="mx-auto text-amber-400 mb-3 relative z-10" />
             <div className="text-xs tracking-[0.3em] text-amber-500 mb-1 relative z-10">ADMIN ACCESS</div>
-            <div className="text-2xl font-bold text-amber-100 relative z-10">PROFESSOR</div>
+            <div className="text-2xl font-bold text-amber-100 relative z-10" style={{fontFamily: FONT_DISPLAY}}>PROFESSOR</div>
             <div className="text-xs text-stone-400 mt-2 relative z-10">Manage accounts</div>
           </button>
           <button onClick={() => setView('student-login')} className="relative bg-gradient-to-br from-red-950 to-black border-2 border-amber-600 p-8 transition-all hover:scale-105 hover:border-amber-400 group overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition" style={{background: 'radial-gradient(circle, #fbbf24, transparent)'}}></div>
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 group-hover:opacity-20 transition" style={{background: 'radial-gradient(circle, #d4af37, transparent)'}}></div>
             <CreditCard size={40} className="mx-auto text-amber-400 mb-3 relative z-10" />
             <div className="text-xs tracking-[0.3em] text-amber-500 mb-1 relative z-10">CLIENT ACCESS</div>
-            <div className="text-2xl font-bold text-amber-100 relative z-10">STUDENT</div>
+            <div className="text-2xl font-bold text-amber-100 relative z-10" style={{fontFamily: FONT_DISPLAY}}>STUDENT</div>
             <div className="text-xs text-stone-400 mt-2 relative z-10">View your card</div>
           </button>
         </div>
         <div className="mt-8 bg-stone-900/50 border border-amber-700/30 text-amber-200/60 p-3 text-xs text-center italic">
-          Welcome. Choose your access type to enter.
+          Secure banking system. Use your access code or professor credentials to sign in.
         </div>
       </div>
     </div>
@@ -299,7 +322,7 @@ function TeacherLoginView({ teacherPass, setTeacherPass, handleLogin, error, set
 
 // ============= STUDENT LOGIN =============
 function StudentLoginView({ studentCode, setStudentCode, studentPin, setStudentPin, handleLogin, loginError, setView, students }) {
-  const codeExists = students.find(s => s.accessCode === studentCode.trim().toUpperCase());
+  const codeExists = students && students.find(s => s.accessCode === studentCode.trim().toUpperCase());
   const isFirstTime = codeExists && !codeExists.pin;
   
   return (
@@ -312,12 +335,12 @@ function StudentLoginView({ studentCode, setStudentCode, studentPin, setStudentP
           <p className="text-stone-400 text-sm text-center mb-6">Enter your code and PIN</p>
           
           <label className="block text-xs tracking-widest text-amber-500 mb-1 font-bold">ACCESS CODE</label>
-          <input type="text" value={studentCode} onChange={(e) => setStudentCode(e.target.value.toUpperCase())} placeholder="EX: A3K9P2" maxLength={6} className="w-full px-4 py-3 border-2 border-amber-700 bg-black text-amber-100 text-center text-xl font-mono tracking-[0.4em] outline-none mb-3 focus:border-amber-400" />
+          <input type="text" value={studentCode} onChange={(e) => setStudentCode(e.target.value.toUpperCase())} placeholder="EX: A3K9P2" maxLength={6} className="w-full px-4 py-2 border-2 border-amber-700 bg-black text-amber-100 text-center text-xl font-mono tracking-[0.4em] outline-none mb-3 focus:border-amber-400" />
           
           <label className="block text-xs tracking-widest text-amber-500 mb-1 font-bold">
             {isFirstTime ? 'CREATE 4-DIGIT PIN (FIRST LOGIN)' : '4-DIGIT PIN'}
           </label>
-          <input type="password" value={studentPin} onChange={(e) => setStudentPin(e.target.value.replace(/\D/g, '').slice(0,4))} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="••••" maxLength={4} className="w-full px-4 py-3 border-2 border-amber-700 bg-black text-amber-100 text-center text-2xl font-mono tracking-[0.6em] outline-none focus:border-amber-400" />
+          <input type="password" value={studentPin} onChange={(e) => setStudentPin(e.target.value.replace(/\D/g, '').slice(0,4))} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="••••" maxLength={4} className="w-full px-4 py-2 border-2 border-amber-700 bg-black text-amber-100 text-center text-2xl font-mono tracking-[0.6em] outline-none focus:border-amber-400" />
           
           {isFirstTime && <div className="text-amber-300 text-xs mt-2 text-center italic">Welcome! Choose a PIN you'll remember.</div>}
           {loginError && <div className="text-red-400 text-sm mt-3 text-center">{loginError}</div>}
@@ -341,7 +364,7 @@ function CreditCardVisual({ student, showCard }) {
     : { background: design.gradient };
   
   const textColor = useCustomImage ? '#ffffff' : design.textColor;
-  const accent = useCustomImage ? '#fbbf24' : design.accent;
+  const accent = useCustomImage ? '#d4af37' : design.accent;
 
   return (
     <div className="relative aspect-[1.586/1] rounded-2xl shadow-2xl overflow-hidden p-6" style={{ ...bgStyle, color: textColor }}>
@@ -421,12 +444,12 @@ function CreditCardVisual({ student, showCard }) {
 // ============= STUDENT VIEW =============
 function StudentView({ student, data, saveData, onLogout }) {
   const [showCard, setShowCard] = useState(true);
-  const [activeModal, setActiveModal] = useState(null); // customize, transfer, shop, pin, theme
+  const [activeModal, setActiveModal] = useState(null);
   const [editName, setEditName] = useState(student.displayName || student.name);
   const [transferTo, setTransferTo] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [transferNote, setTransferNote] = useState('');
-  const [transferTarget, setTransferTarget] = useState('student'); // student or central
+  const [transferTarget, setTransferTarget] = useState('student');
   const [transferError, setTransferError] = useState('');
   const [transferSuccess, setTransferSuccess] = useState('');
   const [shopAmount, setShopAmount] = useState({});
@@ -440,10 +463,10 @@ function StudentView({ student, data, saveData, onLogout }) {
   const themeId = student.theme || 'black_gold';
   const theme = STUDENT_THEMES[themeId];
 
-  const myTx = data.transactions.filter(t => t.studentId === student.id);
+  const myTx = (data.transactions || []).filter(t => t.studentId === student.id);
   const totalEarned = myTx.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const totalSpent = myTx.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const myRequests = data.bonusRequests.filter(r => r.studentId === student.id);
+  const myRequests = (data.bonusRequests || []).filter(r => r.studentId === student.id);
 
   const updateMyData = async (changes) => {
     return await saveData({ ...data, students: data.students.map(s => s.id === student.id ? { ...s, ...changes } : s) });
@@ -509,14 +532,13 @@ function StudentView({ student, data, saveData, onLogout }) {
       date: new Date().toISOString()
     };
     
-    // Reserve money: subtract from student, mark in transaction
     const updated = {
       ...data,
       students: data.students.map(s => s.id === student.id ? { ...s, balance: s.balance - amt, reservedBalance: (s.reservedBalance || 0) + amt } : s),
-      bonusRequests: [request, ...data.bonusRequests],
+      bonusRequests: [request, ...(data.bonusRequests || [])],
       transactions: [
         { id: Date.now() + 'r', studentId: student.id, amount: -amt, reason: `⏳ Bonus request: ${bonus.name} (pending)`, date: new Date().toISOString(), pending: true, requestId: request.id },
-        ...data.transactions
+        ...(data.transactions || [])
       ]
     };
     saveData(updated);
@@ -562,15 +584,15 @@ function StudentView({ student, data, saveData, onLogout }) {
       alert('Could not process the image. Try another one.');
       setUploading(false);
     }
-    e.target.value = ''; // reset so same file can be uploaded again
+    e.target.value = '';
   };
 
   const removeCustomImage = () => {
     updateMyData({ customImage: null });
   };
 
-  const unlockedDesigns = CARD_DESIGNS.filter(d => hasUnlocked(student, d, data.transactions));
-  const lockedDesigns = CARD_DESIGNS.filter(d => !hasUnlocked(student, d, data.transactions));
+  const unlockedDesigns = CARD_DESIGNS.filter(d => hasUnlocked(student, d, data.transactions || []));
+  const lockedDesigns = CARD_DESIGNS.filter(d => !hasUnlocked(student, d, data.transactions || []));
 
   return (
     <div className="min-h-screen p-4" style={{fontFamily: FONT_BODY, background: theme.bgGradient}}>
@@ -634,7 +656,7 @@ function StudentView({ student, data, saveData, onLogout }) {
         <div className="bg-stone-50 border-2" style={{borderColor: theme.secondary}}>
           <div className="p-3 px-4" style={{background: theme.primary, color: theme.accent}}>
             <div className="text-xs tracking-widest" style={{color: theme.secondary}}>STATEMENT</div>
-            <div className="font-bold">Recent Activity</div>
+            <div className="font-bold" style={{fontFamily: FONT_DISPLAY}}>Recent Activity</div>
           </div>
           <div className="max-h-96 overflow-y-auto bg-white">
             {myTx.length === 0 ? (
@@ -883,72 +905,9 @@ function Modal({ children, onClose, theme, title, wide }) {
   );
 }
 
-// ============= STUDENT CODE CARD (Teacher view) =============
-function StudentCodeCard({ student, copiedCode, setCopiedCode }) {
-  const [showPin, setShowPin] = useState(false);
-  
-  const handleCopy = async (value, key) => {
-    if (!value) return;
-    const success = await copyToClipboard(value);
-    if (success) {
-      setCopiedCode(key);
-      setTimeout(() => setCopiedCode(''), 2000);
-    } else {
-      alert(`Could not copy automatically. Manually copy: ${value}`);
-    }
-  };
-
-  return (
-    <div className="bg-black border border-amber-700 p-3">
-      <div className="text-amber-100 mb-3" style={{fontFamily: FONT_DISPLAY, fontSize: '1.25rem', fontWeight: 600}}>{student.name}</div>
-      
-      <div className="space-y-2">
-        <div className="flex items-center justify-between bg-stone-900 p-2 border border-stone-700">
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] tracking-widest text-amber-500 mb-1">ACCESS CODE</div>
-            <div className="text-lg tracking-widest text-amber-400" style={{fontFamily: FONT_MONO, fontWeight: 500}}>{student.accessCode}</div>
-          </div>
-          <button onClick={() => handleCopy(student.accessCode, 'code-' + student.id)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors flex items-center gap-1" title="Copy code">
-            {copiedCode === 'code-' + student.id ? (
-              <><Check size={16} className="text-emerald-400" /><span className="text-xs text-emerald-400">Copied!</span></>
-            ) : (
-              <Copy size={16} />
-            )}
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between bg-stone-900 p-2 border border-stone-700">
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] tracking-widest text-amber-500 mb-1">PIN</div>
-            <div className="text-lg tracking-widest text-amber-400" style={{fontFamily: FONT_MONO, fontWeight: 500}}>
-              {!student.pin ? (
-                <span className="text-stone-500 text-sm italic">Not created yet</span>
-              ) : showPin ? student.pin : '••••'}
-            </div>
-          </div>
-          {student.pin && (
-            <div className="flex items-center">
-              <button onClick={() => setShowPin(!showPin)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors" title={showPin ? 'Hide PIN' : 'Show PIN'}>
-                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-              <button onClick={() => handleCopy(student.pin, 'pin-' + student.id)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors flex items-center gap-1" title="Copy PIN">
-                {copiedCode === 'pin-' + student.id ? (
-                  <><Check size={16} className="text-emerald-400" /><span className="text-xs text-emerald-400">Copied!</span></>
-                ) : (
-                  <Copy size={16} />
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ============= TEACHER VIEW =============
 function TeacherView({ data, saveData, setView, onLogout }) {
-  const [tab, setTab] = useState('students'); // students, requests, central
+  const [tab, setTab] = useState('students');
   const [newStudentName, setNewStudentName] = useState('');
   const [customAmount, setCustomAmount] = useState({});
   const [reason, setReason] = useState({});
@@ -956,7 +915,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
   const [showCodes, setShowCodes] = useState(true);
   const [copiedCode, setCopiedCode] = useState('');
 
-  const pendingRequests = data.bonusRequests.filter(r => r.status === 'pending');
+  const pendingRequests = (data.bonusRequests || []).filter(r => r.status === 'pending');
 
   const addStudent = () => {
     if (!newStudentName.trim()) return;
@@ -976,7 +935,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
 
   const removeStudent = (id) => {
     if (!confirm('Delete this student?')) return;
-    saveData({ ...data, students: data.students.filter(s => s.id !== id), transactions: data.transactions.filter(t => t.studentId !== id), bonusRequests: data.bonusRequests.filter(r => r.studentId !== id) });
+    saveData({ ...data, students: data.students.filter(s => s.id !== id), transactions: (data.transactions || []).filter(t => t.studentId !== id), bonusRequests: (data.bonusRequests || []).filter(r => r.studentId !== id) });
   };
 
   const resetStudentPin = (id) => {
@@ -994,7 +953,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
     const updated = {
       ...data,
       students: data.students.map(s => s.id === studentId ? { ...s, balance: s.balance + amount } : s),
-      transactions: [{ id: Date.now() + Math.random(), studentId, amount, reason: txReason || (amount > 0 ? 'Correct answer' : 'Penalty'), date: new Date().toISOString() }, ...data.transactions]
+      transactions: [{ id: Date.now() + Math.random(), studentId, amount, reason: txReason || (amount > 0 ? 'Correct answer' : 'Penalty'), date: new Date().toISOString() }, ...(data.transactions || [])]
     };
     saveData(updated);
   };
@@ -1013,8 +972,8 @@ function TeacherView({ data, saveData, setView, onLogout }) {
       ...data,
       students: data.students.map(s => s.id === request.studentId ? { ...s, reservedBalance: Math.max(0, (s.reservedBalance || 0) - request.amount) } : s),
       centralBank: { ...data.centralBank, balance: data.centralBank.balance + request.amount },
-      bonusRequests: data.bonusRequests.map(r => r.id === request.id ? { ...r, status: 'approved', resolvedAt: new Date().toISOString() } : r),
-      transactions: data.transactions.map(t => t.requestId === request.id ? { ...t, reason: `✓ Bonus approved: ${request.bonusName}${bonusLabel}`, pending: false } : t)
+      bonusRequests: (data.bonusRequests || []).map(r => r.id === request.id ? { ...r, status: 'approved', resolvedAt: new Date().toISOString() } : r),
+      transactions: (data.transactions || []).map(t => t.requestId === request.id ? { ...t, reason: `✓ Bonus approved: ${request.bonusName}${bonusLabel}`, pending: false } : t)
     };
     updated.transactions = [
       { id: Date.now() + 'c', studentId: CENTRAL_BANK_ID, amount: request.amount, reason: `Bonus payment from ${request.studentName}: ${request.bonusName}`, date: new Date().toISOString() },
@@ -1028,10 +987,9 @@ function TeacherView({ data, saveData, setView, onLogout }) {
     const updated = {
       ...data,
       students: data.students.map(s => s.id === request.studentId ? { ...s, balance: s.balance + request.amount, reservedBalance: Math.max(0, (s.reservedBalance || 0) - request.amount) } : s),
-      bonusRequests: data.bonusRequests.map(r => r.id === request.id ? { ...r, status: 'rejected', resolvedAt: new Date().toISOString() } : r),
-      transactions: data.transactions.map(t => t.requestId === request.id ? { ...t, reason: `✗ Bonus rejected: ${request.bonusName} (refunded)`, pending: false } : t)
+      bonusRequests: (data.bonusRequests || []).map(r => r.id === request.id ? { ...r, status: 'rejected', resolvedAt: new Date().toISOString() } : r),
+      transactions: (data.transactions || []).map(t => t.requestId === request.id ? { ...t, reason: `✗ Bonus rejected: ${request.bonusName} (refunded)`, pending: false } : t)
     };
-    // Add refund transaction
     updated.transactions = [
       { id: Date.now() + 'rf', studentId: request.studentId, amount: request.amount, reason: `Refund: ${request.bonusName}`, date: new Date().toISOString() },
       ...updated.transactions
@@ -1045,7 +1003,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
   };
 
   const sortedStudents = [...data.students].sort((a, b) => b.balance - a.balance);
-  const totalDistributed = data.transactions.filter(t => t.amount > 0 && t.studentId !== CENTRAL_BANK_ID && !t.reason.startsWith('Transfer') && !t.reason.startsWith('Refund')).reduce((s, t) => s + t.amount, 0);
+  const totalDistributed = (data.transactions || []).filter(t => t.amount > 0 && t.studentId !== CENTRAL_BANK_ID && !t.reason.startsWith('Transfer') && !t.reason.startsWith('Refund')).reduce((s, t) => s + t.amount, 0);
 
   return (
     <div className="min-h-screen" style={{fontFamily: FONT_BODY, background: 'linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, #0c0a09 100%)'}}>
@@ -1122,7 +1080,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
             ) : (
               <div className="space-y-3">
                 {sortedStudents.map((student, idx) => {
-                  const unlockedCount = CARD_DESIGNS.filter(d => hasUnlocked(student, d, data.transactions)).length;
+                  const unlockedCount = CARD_DESIGNS.filter(d => hasUnlocked(student, d, data.transactions || [])).length;
                   return (
                   <article key={student.id} className="bg-gradient-to-br from-stone-900 to-black border border-amber-700">
                     <div className="p-5">
@@ -1130,7 +1088,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 flex items-center justify-center font-bold ${idx === 0 ? 'bg-amber-500 text-black' : idx === 1 ? 'bg-stone-400 text-black' : idx === 2 ? 'bg-amber-700 text-black' : 'bg-stone-700 text-stone-300'}`}>{idx + 1}</div>
                           <div>
-                            <h3 className="text-xl font-bold text-amber-100">{student.name}</h3>
+                            <h3 className="text-xl font-bold text-amber-100" style={{fontFamily: FONT_DISPLAY}}>{student.name}</h3>
                             {student.displayName && student.displayName !== student.name && <div className="text-xs text-amber-400 italic">"{student.displayName}"</div>}
                             <div className="text-xs text-stone-500 font-mono">Code: {student.accessCode} · {unlockedCount}/{CARD_DESIGNS.length} cards {student.customImage && '· 📷'}</div>
                           </div>
@@ -1186,7 +1144,7 @@ function TeacherView({ data, saveData, setView, onLogout }) {
                     <div key={r.id} className="bg-amber-950/50 border-2 border-amber-600 p-4">
                       <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
                         <div>
-                          <div className="font-bold text-amber-100 text-lg">{r.bonusName}</div>
+                          <div className="font-bold text-amber-100 text-lg" style={{fontFamily: FONT_DISPLAY}}>{r.bonusName}</div>
                           {r.bonusValue !== null && <div className="text-emerald-400 font-bold">+{r.bonusValue} academic bonus</div>}
                           <div className="text-stone-400 text-sm mt-1">From: <span className="text-amber-200 font-semibold">{r.studentName}</span></div>
                           <div className="text-stone-500 text-xs">{new Date(r.date).toLocaleString('en-US')}</div>
@@ -1210,11 +1168,11 @@ function TeacherView({ data, saveData, setView, onLogout }) {
               </div>
             )}
 
-            {data.bonusRequests.filter(r => r.status !== 'pending').length > 0 && (
+            {(data.bonusRequests || []).filter(r => r.status !== 'pending').length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-stone-400 mb-2 tracking-widest">HISTORY</h3>
                 <div className="space-y-2">
-                  {data.bonusRequests.filter(r => r.status !== 'pending').slice(0, 30).map(r => (
+                  {(data.bonusRequests || []).filter(r => r.status !== 'pending').slice(0, 30).map(r => (
                     <div key={r.id} className="bg-stone-900 border border-stone-700 p-3 flex justify-between items-center">
                       <div>
                         <div className="font-semibold text-amber-100">{r.bonusName}</div>
@@ -1255,10 +1213,10 @@ function TeacherView({ data, saveData, setView, onLogout }) {
 
             <h3 className="text-sm font-bold text-amber-400 mb-2 tracking-widest">CENTRAL BANK ACTIVITY</h3>
             <div className="bg-stone-900 border border-amber-700">
-              {data.transactions.filter(t => t.studentId === CENTRAL_BANK_ID).length === 0 ? (
+              {(data.transactions || []).filter(t => t.studentId === CENTRAL_BANK_ID).length === 0 ? (
                 <p className="text-amber-200/60 italic text-center py-8">No transactions yet.</p>
               ) : (
-                data.transactions.filter(t => t.studentId === CENTRAL_BANK_ID).map(tx => (
+                (data.transactions || []).filter(t => t.studentId === CENTRAL_BANK_ID).map(tx => (
                   <div key={tx.id} className="border-b border-stone-800 p-3 flex justify-between items-center">
                     <div>
                       <div className="font-semibold text-amber-100 text-sm">{tx.reason}</div>
@@ -1276,17 +1234,17 @@ function TeacherView({ data, saveData, setView, onLogout }) {
       {showHistory && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={() => setShowHistory(null)}>
           <div className="bg-stone-50 max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col border-4 border-amber-600" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 flex items-center justify-between" style={{background: 'linear-gradient(135deg, #000000 0%, #1c1917 100%)', color: '#fbbf24'}}>
+            <div className="p-4 flex items-center justify-between" style={{background: 'linear-gradient(135deg, #000000 0%, #1c1917 100%)', color: '#d4af37'}}>
               <div>
                 <div className="text-xs tracking-widest text-amber-500">STATEMENT</div>
-                <h3 className="text-xl font-bold">{data.students.find(s => s.id === showHistory)?.name}</h3>
+                <h3 className="text-xl font-bold" style={{fontFamily: FONT_DISPLAY}}>{data.students.find(s => s.id === showHistory)?.name}</h3>
               </div>
               <button onClick={() => setShowHistory(null)} className="hover:opacity-70 p-2"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto p-4 flex-1">
-              {data.transactions.filter(t => t.studentId === showHistory).length === 0 ? <p className="text-stone-500 italic text-center py-8">No activity.</p> : (
+              {(data.transactions || []).filter(t => t.studentId === showHistory).length === 0 ? <p className="text-stone-500 italic text-center py-8">No activity.</p> : (
                 <div className="space-y-2">
-                  {data.transactions.filter(t => t.studentId === showHistory).map(tx => (
+                  {(data.transactions || []).filter(t => t.studentId === showHistory).map(tx => (
                     <div key={tx.id} className={`bg-white border p-3 flex items-center justify-between ${tx.pending ? 'border-amber-400 bg-amber-50' : 'border-stone-200'}`}>
                       <div className="flex items-center gap-3">
                         {tx.pending ? <Clock className="text-amber-700" size={20} /> :
@@ -1308,6 +1266,68 @@ function TeacherView({ data, saveData, setView, onLogout }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StudentCodeCard({ student, copiedCode, setCopiedCode }) {
+  const [showPin, setShowPin] = useState(false);
+  
+  const handleCopy = async (value, key) => {
+    if (!value) return;
+    const success = await copyToClipboard(value);
+    if (success) {
+      setCopiedCode(key);
+      setTimeout(() => setCopiedCode(''), 2000);
+    } else {
+      alert(`Could not copy automatically. Manually copy: ${value}`);
+    }
+  };
+
+  return (
+    <div className="bg-black border border-amber-700 p-3">
+      <div className="text-amber-100 mb-3" style={{fontFamily: FONT_DISPLAY, fontSize: '1.25rem', fontWeight: 600}}>{student.name}</div>
+      
+      <div className="space-y-2">
+        <div className="flex items-center justify-between bg-stone-900 p-2 border border-stone-700">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] tracking-widest text-amber-500 mb-1">ACCESS CODE</div>
+            <div className="text-lg tracking-widest text-amber-400" style={{fontFamily: FONT_MONO, fontWeight: 500}}>{student.accessCode}</div>
+          </div>
+          <button onClick={() => handleCopy(student.accessCode, 'code-' + student.id)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors flex items-center gap-1" title="Copy code">
+            {copiedCode === 'code-' + student.id ? (
+              <><Check size={16} className="text-emerald-400" /><span className="text-xs text-emerald-400">Copied!</span></>
+            ) : (
+              <Copy size={16} />
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between bg-stone-900 p-2 border border-stone-700">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] tracking-widest text-amber-500 mb-1">PIN</div>
+            <div className="text-lg tracking-widest text-amber-400" style={{fontFamily: FONT_MONO, fontWeight: 500}}>
+              {!student.pin ? (
+                <span className="text-stone-500 text-sm italic">Not created yet</span>
+              ) : showPin ? student.pin : '••••'}
+            </div>
+          </div>
+          {student.pin && (
+            <div className="flex items-center">
+              <button onClick={() => setShowPin(!showPin)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors" title={showPin ? 'Hide PIN' : 'Show PIN'}>
+                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              <button onClick={() => handleCopy(student.pin, 'pin-' + student.id)} className="text-amber-400 hover:text-amber-300 hover:bg-stone-800 p-2 transition-colors flex items-center gap-1" title="Copy PIN">
+                {copiedCode === 'pin-' + student.id ? (
+                  <><Check size={16} className="text-emerald-400" /><span className="text-xs text-emerald-400">Copied!</span></>
+                ) : (
+                  <Copy size={16} />
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
