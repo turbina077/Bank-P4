@@ -14,23 +14,10 @@ const DEFAULT_DATA = {
   centralBank: { balance: 0, name: 'P4 Central Bank' }
 };
 
-// 15 Themes for student interface
+// Themes for student interface
 const STUDENT_THEMES = {
   black_gold: { name: 'Black & Gold', primary: '#000000', secondary: '#d4af37', accent: '#f5e7b8', bgGradient: 'linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #000000 100%)' },
-  midnight: { name: 'Midnight Blue', primary: '#0a1628', secondary: '#3b82f6', accent: '#bfdbfe', bgGradient: 'linear-gradient(135deg, #0a1628 0%, #1e2a4a 50%, #0a1628 100%)' },
-  rose_magic: { name: 'Rose Magic', primary: '#500724', secondary: '#ec4899', accent: '#fce7f3', bgGradient: 'linear-gradient(135deg, #500724 0%, #831843 50%, #be185d 100%)' },
-  lavender_dream: { name: 'Lavender Dream', primary: '#4c1d95', secondary: '#a78bfa', accent: '#ede9fe', bgGradient: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a78bfa 100%)' },
-  coral_sunset: { name: 'Coral Sunset', primary: '#881337', secondary: '#fb7185', accent: '#ffe4e6', bgGradient: 'linear-gradient(135deg, #881337 0%, #be185d 50%, #fb7185 100%)' },
-  peach_cream: { name: 'Peach Cream', primary: '#92400e', secondary: '#fb923c', accent: '#ffedd5', bgGradient: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 50%, #fb923c 100%)' },
-  emerald_forest: { name: 'Emerald Forest', primary: '#022c22', secondary: '#10b981', accent: '#d1fae5', bgGradient: 'linear-gradient(135deg, #022c22 0%, #064e3b 50%, #10b981 100%)' },
-  ocean_cyan: { name: 'Ocean Cyan', primary: '#0c4a6e', secondary: '#06b6d4', accent: '#cffafe', bgGradient: 'linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #06b6d4 100%)' },
-  sunset_orange: { name: 'Sunset Orange', primary: '#7c2d12', secondary: '#f97316', accent: '#fed7aa', bgGradient: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 50%, #f97316 100%)' },
-  mint_fresh: { name: 'Mint Fresh', primary: '#064e3b', secondary: '#14b8a6', accent: '#ccfbf1', bgGradient: 'linear-gradient(135deg, #064e3b 0%, #0d9488 50%, #14b8a6 100%)' },
-  blueberry: { name: 'Blueberry', primary: '#1e3a8a', secondary: '#3b82f6', accent: '#dbeafe', bgGradient: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%)' },
-  amber_fire: { name: 'Amber Fire', primary: '#78350f', secondary: '#f59e0b', accent: '#fef3c7', bgGradient: 'linear-gradient(135deg, #78350f 0%, #b45309 50%, #f59e0b 100%)' },
-  violet_dark: { name: 'Violet Dark', primary: '#2e1065', secondary: '#7c3aed', accent: '#ede9fe', bgGradient: 'linear-gradient(135deg, #2e1065 0%, #5b21b6 50%, #7c3aed 100%)' },
-  slate_pro: { name: 'Slate Pro', primary: '#1e293b', secondary: '#64748b', accent: '#f1f5f9', bgGradient: 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%)' },
-  jade_green: { name: 'Jade Green', primary: '#0a5f4a', secondary: '#2dd4bf', accent: '#ccfbf1', bgGradient: 'linear-gradient(135deg, #0a5f4a 0%, #0d9488 50%, #2dd4bf 100%)' },
+  midnight: { name: 'Midnight Blue', primary: '#0a1628', secondary: '#d4af37', accent: '#f5e7b8', bgGradient: 'linear-gradient(135deg, #0a1628 0%, #1e2a4a 50%, #0a1628 100%)' },
 };
 
 // Use system fonts that are elegant and always available
@@ -666,18 +653,19 @@ function StudentView({ student, data, saveData, onLogout }) {
           </div>
         </div>
 
-        {/* LEADERBOARD SECTION */}
+        {/* LEADERBOARD */}
         <div className="mb-6">
-          <h3 className="text-lg font-bold mb-3" style={{fontFamily: FONT_DISPLAY, color: theme.accent}}>🏆 TOP 10 RANKING</h3>
+          <div className="text-lg font-bold mb-3" style={{fontFamily: FONT_DISPLAY, color: theme.accent}}>🏆 TOP 10 RANKING</div>
           <div className="bg-stone-900 border-2 rounded-lg overflow-hidden" style={{borderColor: theme.secondary}}>
             {(() => {
               const sortedStudents = [...(data.students || [])].sort((a, b) => b.balance - a.balance);
               const myRank = sortedStudents.findIndex(s => s.id === student.id) + 1;
-              const myPercentile = Math.round((myRank / Math.max(sortedStudents.length, 1)) * 100);
+              const totalStudents = sortedStudents.length;
+              const myPercentile = totalStudents > 0 ? Math.round(((totalStudents - myRank + 1) / totalStudents) * 100) : 0;
               
               return (
                 <>
-                  {/* MI POSICIÓN */}
+                  {/* MY POSITION */}
                   <div className="p-4 border-b-2 flex items-center justify-between" style={{borderColor: theme.secondary, background: theme.light}}>
                     <div className="flex items-center gap-3">
                       <Trophy size={24} style={{color: theme.secondary}} />
@@ -687,10 +675,7 @@ function StudentView({ student, data, saveData, onLogout }) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs" style={{color: theme.secondary}}>Better than {myPercentile}%</div>
-                      <div className="w-40 h-2 bg-black/40 rounded-full overflow-hidden mt-1">
-                        <div className="h-full" style={{width: `${((sortedStudents.length - myRank) / Math.max(sortedStudents.length, 1)) * 100}%`, background: 'linear-gradient(90deg, ' + theme.secondary + ' 0%, ' + theme.accent + ' 100%)'}}></div>
-                      </div>
+                      <div className="text-xs" style={{color: theme.accent}}>Better than {myPercentile}%</div>
                     </div>
                   </div>
 
@@ -698,24 +683,16 @@ function StudentView({ student, data, saveData, onLogout }) {
                   {sortedStudents.slice(0, 10).map((s, idx) => {
                     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx < 5 ? '⭐' : '✨';
                     const isMe = s.id === student.id;
-                    
                     return (
-                      <div key={s.id} className="p-4 border-b flex items-center justify-between hover:opacity-80 transition"
-                        style={{
-                          borderColor: theme.secondary + '40',
-                          background: isMe ? theme.light : 'transparent'
-                        }}>
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="text-2xl w-8">{medal}</div>
+                      <div key={s.id} className="p-3 border-b flex items-center justify-between" style={{borderColor: theme.secondary + '40', background: isMe ? theme.light : 'transparent'}}>
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl">{medal}</div>
                           <div>
-                            <div className="font-bold text-sm" style={{color: theme.accent}}>
-                              {s.displayName || s.name}
-                              {isMe && ' (You)'}
-                            </div>
+                            <div className="text-sm font-bold" style={{color: theme.accent}}>{s.displayName || s.name}{isMe ? ' (You)' : ''}</div>
                             <div className="text-xs" style={{color: theme.secondary}}>{formatMoney(s.balance)}</div>
                           </div>
                         </div>
-                        {isMe && <Check size={20} style={{color: theme.secondary}} />}
+                        {isMe && <Check size={18} style={{color: theme.secondary}} />}
                       </div>
                     );
                   })}
