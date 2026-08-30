@@ -23,36 +23,3 @@ const auth = getAuth(app);
 signInAnonymously(auth).catch((err) => console.error('Error de autenticación anónima:', err));
 
 // ID de la clase
-const CLASS_ID = 'p4-rrii-default';
-
-// Referencia a la base de datos
-export const dataRef = ref(db, `clases/${CLASS_ID}`);
-
-// Guardar datos
-export const saveBankData = (data) => {
-  return set(dataRef, { ...data, updatedAt: Date.now() });
-};
-
-// Escuchar cambios en tiempo real
-export const subscribeToData = (callback) => {
-  return onValue(dataRef, (snapshot) => {
-    const data = snapshot.val();
-    callback(data || { 
-      students: [], 
-      transactions: [], 
-      bonusRequests: [], 
-      centralBank: { balance: 0, name: 'P4 Central Bank' } 
-    });
-  });
-};
-
-// Obtener datos una sola vez
-export const getDataOnce = async () => {
-  const snapshot = await get(dataRef);
-  return snapshot.val() || { 
-    students: [], 
-    transactions: [], 
-    bonusRequests: [], 
-    centralBank: { balance: 0, name: 'P4 Central Bank' } 
-  };
-};
