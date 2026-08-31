@@ -4,7 +4,7 @@ import { saveBankData, subscribeToData } from './firebase';
 
 const TEACHER_PASSWORD = 'urbina2026';
 const CENTRAL_BANK_ID = 'CENTRAL_BANK';
-const CLASS_CODE = 'RRII2026';
+const CLASS_CODE = 'P42027';
 const CURRENCY_NAME = 'IGOs';
 
 // Default data structure - SIEMPRE tiene estos campos
