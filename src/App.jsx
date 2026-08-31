@@ -380,7 +380,7 @@ export default function App() {
       id: Date.now().toString(), name, displayName: name, balance: 0,
       cardNumber: generateCardNumber(), cvv: generateCVV(),
       validThru: `${String(t.getMonth() + 1).padStart(2, '0')}/${String((t.getFullYear() + 4) % 100).padStart(2, '0')}`,
-      accessCode: access, cardDesign: 'emerald', pin: suPin, theme: 'midnight_plum',
+      accessCode: access, cardDesign: 'emerald', pin: suPin, theme: 'imperial_blue',
       reservedBalance: 0, frozen: false, sanctioned: false
     };
     const ok = await saveData({ ...data, students: [...(data.students || []), fresh] });
@@ -712,8 +712,8 @@ function StudentView({ student, data, saveData, onLogout, toast }) {
   const fileInputRef = useRef();
   const previousBalance = useRef(student.balance);
 
-  const themeId = student.theme || 'midnight_plum';
-  const theme = STUDENT_THEMES[themeId] || STUDENT_THEMES.midnight_plum;
+  const themeId = (student.theme && STUDENT_THEMES[student.theme]) ? student.theme : 'imperial_blue';
+  const theme = STUDENT_THEMES[themeId] || STUDENT_THEMES.imperial_blue;
   const myTx = (data.transactions || []).filter(t => t.studentId === student.id);
   const totalEarned = myTx.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
   const totalSpent = myTx.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
@@ -1463,7 +1463,7 @@ function TeacherView({ data, saveData, setView, onLogout, toast }) {
     const newStudent = {
       id: Date.now().toString(), name: newStudentName.trim(), displayName: newStudentName.trim(),
       balance: 0, cardNumber: generateCardNumber(), cvv: generateCVV(),
-      validThru, accessCode, cardDesign: 'midnight', pin: null, theme: 'midnight_plum',
+      validThru, accessCode, cardDesign: 'midnight', pin: null, theme: 'imperial_blue',
       reservedBalance: 0
     };
     saveData({ ...data, students: [...data.students, newStudent] });
